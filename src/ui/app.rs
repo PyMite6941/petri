@@ -2,17 +2,14 @@ use eframe::egui;
 use crate::sandbox::sandbox::PetriSandbox;
 
 pub struct PetriApp {
-    sandbox: Option<PetriSandbox>,
+    sandboxes: Vec<PetriSandbox>,
     sandbox_name:String,
 }
 
 impl PetriApp {
     pub fn new() -> Self {
         Self {
-            sandbox: PetriSandbox::new_sandbox(
-                1,
-                String::from("Test Sandbox"),
-            ),
+            sandboxes: Vec::new(),
             sandbox_name: String::new(),
         }
     }
@@ -26,14 +23,15 @@ impl eframe::App for PetriApp {
             ui.label("Create a Sandbox");
             ui.text_edit_singleline(&mut self.sandbox_name);
             ui.separator();
+            
             ui.label("Sandbox:");
             ui.label(format!("ID: {}", self.sandbox.id()));
-            if self.sandbox.name().is_empty() {
-                self.sandbox.set_name(String::from("petri-sandbox"));
+            if self.sandboxes.name().is_empty() {
+                self.sandboxes.set_name(String::from("petri-sandbox"));
             }
-            ui.label(format!("Name: {}", self.sandbox.name()));
+            ui.label(format!("Name: {}", self.sandboxes.name()));
             ui.separator();
-            ui.label(format!("State: {:?}",self.sandbox.state()));
+            ui.label(format!("State: {:?}",self.sandboxes.state()));
             ui.separator();
             if ui.button("Start Sandbox").clicked() {
                 self.sandbox.start_sandbox();
