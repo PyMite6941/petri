@@ -1,7 +1,9 @@
 use super::state::Isolated;
 use super::state::PetriState;
+use super::state::SandboxError;
+use super::state::PetriPermissions;
 use std::path::PathBuf;
-use std::process::Command;
+use std::process::{Command,Child};
 
 #[derive(Debug)]
 pub struct PetriSandbox {
@@ -10,6 +12,8 @@ pub struct PetriSandbox {
     pub state:PetriState,
     pub isolate:Isolated,
     pub directory:PathBuf,
+    pub permissions:Vec<>,
+    pub process:Option<Child>,
 }
 
 impl PetriSandbox {
@@ -20,6 +24,8 @@ impl PetriSandbox {
             state: PetriState::Created,
             isolate:Isolated::NotIsolated,
             directory: PathBuf::from(format!("sandboxes/sandbox-{}",id)),
+            permissions: Vec<PetriPermissions>;
+            process: None,
         }
     }
 
@@ -51,7 +57,7 @@ impl PetriSandbox {
     }
 
     pub fn isolate_sandbox(&mut self) -> Result<(), SandboxError> {
-        if !self.isolate.can_isolate(&self.state,Isolated::Isolating) {
+        if !self.isolate.can_isolate(&self.state,&Isolated::Isolating) {
             return Err(SandboxError::InvalidStateTransition);
         }
         self.isolate = Isolated::Isolating;

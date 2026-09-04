@@ -28,14 +28,16 @@ pub enum SandboxError {
     InvalidStateTransition,
     SandboxNotFound,
     DirectoryCreationFailed,
-    ProcessLaunchFailed,
+    ProcessLaunchFailed(std::io::Error),
     ProcessStopFailed,
     IsolationFailed,
     InvalidConfiguration(String),
 }
 
-impl SandboxError {
-
+impl From<std::io::Error> for SandboxError {
+    fn from(error:std::io::Error) -> Self {
+        SandboxError::ProcessLaunchFailed(error)
+    }
 }
 
 #[derive(Debug)]
@@ -46,11 +48,16 @@ pub enum Isolated {
 }
 
 impl Isolated {
-    pub fn can_isolate(&self,state:&PetriState,next:Isolated) -> bool {
+    pub fn can_isolate(&self,state:&PetriState,next:&Isolated) -> bool {
         match (self,state,next) {
-            (Isolated::NotIsolated,state::Running,next::Isolating) => true,
-            (Isolated::NotIsolated,state::Stopped,next::Isolating) => true,
+            (Isolated::NotIsolated,PetriState::Running,Isolated::Isolating) => true,
+            (Isolated::NotIsolated,PetriState::Stopped,Isolated::Isolating) => true,
             _ => false,
         }
     }
+}
+
+#[derive(Debug)]
+pub enum PetriPermissions {
+    
 }
