@@ -14,8 +14,9 @@ Written in Rust, with an [egui](https://github.com/emilk/egui) desktop UI.
 
 Read this before you clone it. Being straight about the state of the code:
 
-- **`cargo check` currently fails.** Three compile errors, all in
-  `src/sandbox/sandbox.rs`. This is expected — the code is mid-write.
+- **`cargo check` currently fails.** Seven compile errors, in
+  `src/sandbox/sandbox.rs` and `src/ui/ui_display.rs`. This is expected — the
+  code is mid-write.
 - **The sandbox does not isolate anything yet.** `PetriSandbox` is a state
   machine plus a directory path. `isolate_sandbox()` flips an enum and returns
   `Ok`; there is no namespace, no jail, no seccomp, no container behind it. The
@@ -61,7 +62,7 @@ registry. The point is to make intent readable, not to actually do the thing.
 | `src/sandbox/state.rs` | `PetriState`, `Isolated`, `PetriPermissions`, `SandboxError` | mostly there |
 | `src/sandbox/sandbox.rs` | `PetriSandbox` — lifecycle, permissions, process handle | **doesn't compile**; isolation is a stub |
 | `src/storage/storage.rs` | `PetriStorage` — creates the per-sandbox directory tree | works |
-| `src/ui/ui_display.rs` | `Display` for `SandboxError` and `PetriPermissions` — the human-readable error text | live |
+| `src/ui/ui_display.rs` | `Display` for `SandboxError` — the human-readable error text | declared in `mod.rs`; **doesn't compile** |
 | `MILESTONES.md` | the roadmap and the accountability log | the plan |
 | `run.sh`, `compile.sh` | leftovers from a Docker experiment | not wired to anything |
 
@@ -70,6 +71,8 @@ registry. The point is to make intent readable, not to actually do the thing.
 ```bash
 cargo run          # will fail until the compile errors are fixed
 ```
+
+Build output goes to `dist/`, not `target/` (`.cargo/config.toml`).
 
 Rust 2024 edition. The only direct dependency is `eframe` 0.32.
 
