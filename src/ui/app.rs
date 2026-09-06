@@ -1,7 +1,5 @@
 use eframe::egui;
-use core::error;
-use std::{fmt, string};
-use crate::sandbox::{sandbox::PetriSandbox, state::SandboxError};
+use crate::sandbox::sandbox::PetriSandbox;
 
 pub struct PetriApp {
     sandboxes: Vec<PetriSandbox>,
@@ -13,37 +11,6 @@ impl PetriApp {
         Self {
             sandboxes: Vec::new(),
             sandbox_name: String::new(),
-        }
-    }
-}
-
-impl fmt::Display for SandboxError {
-    fn fmt(&self,f:&mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            SandboxError::InvalidStateTransition => {
-                write!(f,"Invalid sandbox state transition")
-            }
-            SandboxError::ProcessLaunchFailed(error) => {
-                write!(f,"Failed to launch process: {}",error)
-            }
-            SandboxError::SandboxNotFound => {
-                write!(f,"Sandbox not found")
-            }
-            SandboxError::DirectoryCreationFailed => {
-                write!(f,"Failed to create sandbox directory")
-            }
-            SandboxError::IsolationFailed => {
-                write!(f,"Failed to isolate sandbox")
-            }
-            SandboxError::InvalidConfiguration(error) => {
-                write!(f,"Invalid Configuration: {}",error)
-            }
-            SandboxError::ProcessStopFailed => {
-                write!(f,"Failed to stop process")
-            }
-            SandboxError::PermissionNotFound(permission) => {
-                write!(f,"Invalid Permission: {}",permission)
-            }
         }
     }
 }

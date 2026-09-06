@@ -14,8 +14,8 @@ Written in Rust, with an [egui](https://github.com/emilk/egui) desktop UI.
 
 Read this before you clone it. Being straight about the state of the code:
 
-- **`cargo check` currently fails.** There are four compile errors in
-  `src/sandbox/` and `src/ui/`. This is expected — the code is mid-write.
+- **`cargo check` currently fails.** Three compile errors, all in
+  `src/sandbox/sandbox.rs`. This is expected — the code is mid-write.
 - **The sandbox does not isolate anything yet.** `PetriSandbox` is a state
   machine plus a directory path. `isolate_sandbox()` flips an enum and returns
   `Ok`; there is no namespace, no jail, no seccomp, no container behind it. The
@@ -57,11 +57,11 @@ registry. The point is to make intent readable, not to actually do the thing.
 | Path | What it is | State |
 |---|---|---|
 | `src/main.rs` | eframe entry point, boots `PetriApp` | works |
-| `src/ui/app.rs` | the egui window — sandbox list, create/start/isolate/destroy buttons | **doesn't compile** (borrow errors) |
+| `src/ui/app.rs` | the egui window — sandbox list, create/start/isolate/destroy buttons | compiles; borrow errors will surface once the lib builds |
 | `src/sandbox/state.rs` | `PetriState`, `Isolated`, `PetriPermissions`, `SandboxError` | mostly there |
 | `src/sandbox/sandbox.rs` | `PetriSandbox` — lifecycle, permissions, process handle | **doesn't compile**; isolation is a stub |
 | `src/storage/storage.rs` | `PetriStorage` — creates the per-sandbox directory tree | works |
-| `src/ui/ui_display.rs` | `Display` for `SandboxError` | not compiled — not declared in `mod.rs`, and its variant shapes are stale against `state.rs`. The live impl is in `app.rs` |
+| `src/ui/ui_display.rs` | `Display` for `SandboxError` and `PetriPermissions` — the human-readable error text | live |
 | `MILESTONES.md` | the roadmap and the accountability log | the plan |
 | `run.sh`, `compile.sh` | leftovers from a Docker experiment | not wired to anything |
 

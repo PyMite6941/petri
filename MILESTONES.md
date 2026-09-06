@@ -11,13 +11,11 @@ back in.
 
 ## Milestones
 
-- [ ] **M1 — It compiles.** `cargo check` is clean. Today it fails with four
-      errors:
-      - `sandbox.rs:16` — `permissions: vec![]` puts a value where a type
-        belongs; rustc reads it as return-type notation and throws twice.
-      - `sandbox.rs:66` — `self.pernissions` is a typo for `permissions`.
-      - `app.rs:45` — `PetriPermissions` has no `Display` impl but is formatted
-        with `{}`.
+- [ ] **M1 — It compiles.** `cargo check` is clean. Today it fails with three
+      errors, all in `sandbox.rs`:
+      - line 16 — `permissions: vec![]` puts a value where a type belongs;
+        rustc reads it as return-type notation and throws twice.
+      - line 66 — `self.pernissions` is a typo for `permissions`.
       Expect more once those clear: `app.rs` iterates `&self.sandboxes` while
       calling `&mut self` methods on the items, and feeds a `Vec` to
       `text_edit_multiline`. Rustc stops at the first failing target.
@@ -70,4 +68,7 @@ back in.
   errors). Repo set up for publication: custom source-available LICENSE,
   NOTICE, CONTRIBUTING (no contributors), SECURITY, AUTHORS, README rewritten
   to match the actual code. Milestones re-cut for the Rust path. The last
-  Python file was deleted and `*.py` is gitignored. Next up: M1.
+  Python file was deleted and `*.py` is gitignored. `ui_display.rs` wired into
+  `ui/mod.rs` as the single home for error display (duplicate `uiDisplay.rs`
+  deleted, impl lifted out of `app.rs`, `Display` added for
+  `PetriPermissions`) — 4 errors down to 3. Next up: M1.
