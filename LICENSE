@@ -1,0 +1,160 @@
+Petri Source-Available License
+Version 1.0 — 6 September 2026
+
+Copyright (c) 2026 PyMite6941. All rights reserved.
+
+"The Software" means the Petri source code, documentation and assets in this
+repository, in whole or in part.
+
+"The Official Repository" means <https://github.com/PyMite6941/petri>, which is
+the sole authorized channel for obtaining and distributing the Software.
+
+READ THIS FIRST
+---------------
+This is NOT an open source license. It is not OSI-approved, and it is not the
+MIT, BSD, Apache or GPL license despite superficially resembling one. The
+Software is free of charge to download and use. It is not free to redistribute.
+
+
+1. GRANT
+
+Subject to every condition below, you are granted a worldwide, royalty-free,
+non-exclusive, non-transferable, revocable license to:
+
+  a. download the Software from the Official Repository, at no cost;
+  b. run the Software on machines you own or control, for any purpose
+     permitted by section 4, including commercial use;
+  c. read, study and reverse engineer the Software;
+  d. modify the Software for your own private use; and
+  e. quote or reuse excerpts of the Software in your own work, provided you
+     comply with the attribution requirement in section 2.
+
+No fee may be charged to you for the Software by anyone. If you were charged
+for a copy of the Software, that copy was distributed in violation of this
+license.
+
+
+2. ATTRIBUTION IS MANDATORY
+
+Any copy, excerpt, adaptation, translation or derivative of the Software that
+appears in your own work — source code, a compiled binary, a blog post, a
+video, a course, a paper, a talk, an AI-generated output, or anything else —
+must carry visible credit naming the Software and linking to the Official
+Repository.
+
+The minimum acceptable credit is reproduced in the NOTICE file. In source code
+it belongs in a comment adjacent to the copied code; in a compiled application
+it belongs in an about box, a credits screen, or an accompanying license file;
+in written or recorded work it belongs in the body or the references.
+
+Credit that is stripped, obscured, relocated to an unpublished file, or
+replaced with your own authorship claim does not satisfy this section. You may
+not represent the Software, or any part of it, as your own original work.
+
+
+3. REDISTRIBUTION IS PROHIBITED
+
+Except as expressly permitted by section 3.1, you may NOT distribute, publish,
+mirror, host, re-upload, sublicense, sell, rent, lease, bundle or otherwise
+make the Software available to any third party. The Official Repository is the
+only authorized source. Everyone who wants a copy must obtain it from there.
+
+Prohibited without limitation:
+
+  a. mirroring the Software on another code host, file host, CDN, torrent,
+     archive, image, or download site;
+  b. publishing the Software, or a repackaging of it, to any package registry
+     (including crates.io, npm, PyPI, Homebrew, AUR, Docker Hub, Flathub,
+     winget, an OS distribution's package repositories, or an app store);
+  c. distributing compiled binaries, installers or containers built from the
+     Software to anyone other than yourself;
+  d. selling the Software, charging for access to it, or placing it behind a
+     paywall, subscription, advertisement wall or lead-capture form;
+  e. distributing a modified version, fork or derivative of the Software
+     outside the Official Repository;
+  f. including the Software in a larger work that you then distribute; or
+  g. using the Software as training data for a machine learning model whose
+     outputs are made available to third parties.
+
+3.1 Permitted exceptions
+
+  a. GitHub forks. Forking the Official Repository using GitHub's own fork
+     mechanism is permitted, because it is a function of the platform hosting
+     the Official Repository. A GitHub fork must remain a fork on GitHub: you
+     may not detach it, re-license it, remove this LICENSE or the NOTICE file,
+     present it as an independent project, or use it as a staging point for any
+     distribution prohibited by section 3.
+  b. Linking. You may link to the Official Repository freely. Linking is the
+     intended way to share the Software with someone else.
+  c. Excerpts. Quoting portions of the Software under section 1(e) with the
+     attribution required by section 2 is not "redistribution", provided the
+     excerpt is not a substitute for obtaining the Software itself.
+  d. Backups. You may keep private copies and backups for your own use.
+
+
+4. ACCEPTABLE USE
+
+Petri is a containment lab for BENIGN, simulated malware specimens that you
+wrote yourself. As a condition of this license you may not:
+
+  a. load, execute, analyze or store live malware, real malicious payloads, or
+     any sample obtained from a malware corpus in the Software;
+  b. use the Software to develop, test, refine, package or evade detection of
+     software intended to cause harm, or to compromise any system or data you
+     do not own or have written authorization to test; or
+  c. remove, disable or circumvent the containment guarantees described in the
+     project documentation and then distribute the result under the name
+     "Petri".
+
+Breach of this section terminates your license immediately.
+
+
+5. NO CONTRIBUTIONS
+
+Petri is a single-author project. It accepts no contributors. Pull requests,
+patches, and code submissions of any kind are not solicited, not reviewed, and
+will be closed unmerged. Nothing in this license grants you any right to have
+your work incorporated into the Software, and no contributor license agreement
+exists because there are no contributors. See CONTRIBUTING.md.
+
+
+6. RESERVATION OF RIGHTS
+
+All rights not expressly granted in section 1 are reserved by the copyright
+holder. The Software is licensed, not sold. No trademark rights, patent
+rights, or rights to the name "Petri" are granted.
+
+
+7. TERMINATION
+
+This license terminates automatically and without notice if you breach any
+term of it. On termination you must stop using the Software and destroy all
+copies in your possession, except for copies whose retention is required by
+law. Sections 2, 6, 8 and 9 survive termination. The copyright holder may
+grant a written exception to any restriction here; only a written grant
+counts.
+
+
+8. NO WARRANTY
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE, TITLE AND NONINFRINGEMENT. THE SOFTWARE IS
+INCOMPLETE, UNDER ACTIVE DEVELOPMENT, AND IS NOT REPRESENTED AS PROVIDING
+EFFECTIVE SECURITY ISOLATION.
+
+
+9. LIMITATION OF LIABILITY
+
+IN NO EVENT SHALL THE COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES OR
+OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+IN THE SOFTWARE.
+
+
+10. LICENSING EXCEPTIONS
+
+To request permission for anything this license prohibits — redistribution,
+packaging, bundling, or commercial distribution — open a discussion at the
+Official Repository or contact the copyright holder. Permission is granted in
+writing or not at all.

@@ -1,0 +1,9 @@
+Petri is written entirely by one person.
+
+    PyMite6941 <https://github.com/PyMite6941>
+
+There are no other authors, contributors, maintainers or copyright holders, and
+by design there will not be. See CONTRIBUTING.md and LICENSE §5.
+
+Third-party dependencies (eframe/egui and the crates in Cargo.lock) are the work
+of their own authors and are not covered by this file — see NOTICE.

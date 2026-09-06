@@ -1,64 +1,110 @@
 # Petri
 
-A lab for **benign, simulated** malware specimens: you write small programs that
-*mimic* malware behaviors, then break them down and analyze them — statically
-(without running) and behaviorally (in a disposable sandbox). It's the
-malware-analysis bench for learning how these things work by building and
-dissecting harmless stand-ins.
+A sandbox manager for **benign, simulated** malware specimens — small programs
+you write yourself that *mimic* malware behavior, so you can break them down and
+watch what they do without any of it being real. It's a malware-analysis bench
+for learning how these things work by building and dissecting harmless
+stand-ins.
 
-## This is yours to build
+Written in Rust, with an [egui](https://github.com/emilk/egui) desktop UI.
 
-The interesting parts — the analysis engine and the specimens — are **Matt's to
-write**. The repo ships a *frame*, not the algorithm:
+---
 
-| File | State | Whose |
+## ⚠️ This is a work in progress and it does not build yet
+
+Read this before you clone it. Being straight about the state of the code:
+
+- **`cargo check` currently fails.** There are four compile errors in
+  `src/sandbox/` and `src/ui/`. This is expected — the code is mid-write.
+- **The sandbox does not isolate anything yet.** `PetriSandbox` is a state
+  machine plus a directory path. `isolate_sandbox()` flips an enum and returns
+  `Ok`; there is no namespace, no jail, no seccomp, no container behind it. The
+  containment is *designed*, not *implemented*.
+- **There are no specimens.** Nothing to detonate.
+- **`start_sandbox()` spawns a literal placeholder** (`Command::new("some-program")`).
+
+So: nothing here is safe to point at anything real, and there is no working
+product to download and use yet. If you came looking for a finished tool, this
+isn't one. It's a build log you can read.
+
+**Never load real malware into this.** Not now, not when it compiles. See
+[SECURITY.md](SECURITY.md).
+
+---
+
+## What it's meant to become
+
+A desktop app where you create named sandboxes, give each one an explicit
+permission set, drop a specimen into it, and watch what it does:
+
+- **Sandboxes have a lifecycle.** `Created → Starting → Running → Stopping →
+  Stopped → Destroyed`, with illegal transitions refused rather than tolerated
+  (`PetriState::can_transition`).
+- **Permissions are opt-in, not opt-out.** `ReadFiles`, `WriteFiles`,
+  `ExecutePrograms`, `NetworkAccess` — a sandbox starts with none of them.
+- **Isolation is a separate axis from run state.** `NotIsolated → Isolating →
+  Isolated`, and a sandbox can only be isolated from `Running` or `Stopped`.
+- **Everything lives under `sandboxes/sandbox-<id>/`** with `files/` and `logs/`
+  subdirectories, created by `PetriStorage` and thrown away afterwards.
+
+The design rule underneath all of it: a specimen never gets the real machine, it
+gets a sandbox. Dangerous behaviors get *simulated and logged*, never performed —
+a "C2 beacon" is recorded and never sent, "persistence" writes to a fake
+registry. The point is to make intent readable, not to actually do the thing.
+
+## Repo layout
+
+| Path | What it is | State |
 |---|---|---|
-| `petri.py` | frame (CLI wiring) | provided |
-| `petri/core/safety.py` | **implemented** — the containment guardrail | provided |
-| `petri/core/analyzer.py` | **stubbed, throws** — the static breakdown engine | **you** |
-| `specimens/base.py` | the specimen contract | reference |
-| `specimens/*.py` | **empty** — the benign specimens | **you** |
+| `src/main.rs` | eframe entry point, boots `PetriApp` | works |
+| `src/ui/app.rs` | the egui window — sandbox list, create/start/isolate/destroy buttons | **doesn't compile** (borrow errors) |
+| `src/sandbox/state.rs` | `PetriState`, `Isolated`, `PetriPermissions`, `SandboxError` | mostly there |
+| `src/sandbox/sandbox.rs` | `PetriSandbox` — lifecycle, permissions, process handle | **doesn't compile**; isolation is a stub |
+| `src/storage/storage.rs` | `PetriStorage` — creates the per-sandbox directory tree | works |
+| `src/ui/ui_display.rs`, `src/ui/uiDisplay.rs` | duplicate `Display` impls, neither declared in `mod.rs` | dead files, to be deleted |
+| `MILESTONES.md` | the roadmap and the accountability log | the plan |
+| `petri.py`, `run.sh`, `compile.sh` | leftovers from an earlier Python prototype and a Docker experiment | not wired to anything |
 
-`analyze`/`detonate` will raise `NotImplementedError` until you build them. That's
-the intended starting state. Keep the frame or throw it out and design your own —
-the only thing that isn't negotiable is the safety contract below.
-
-## The one rule: containment
-
-Everything in here is safe **only** because specimens can't touch the real
-machine. The design that enforces it:
-
-1. **A specimen never gets the real OS — it gets a `Sandbox`.** All real actions
-   (file writes) are confined to a throwaway temp directory that is deleted after
-   each run. Path escapes are refused.
-2. **Dangerous behaviors are simulated, not performed.** "Persistence" writes to
-   an in-memory fake registry; a "C2 beacon" is logged and **never sent**. Intent
-   is recorded so you can analyze it; nothing leaves the sandbox.
-3. **Specimens are benign by construction.** They simulate a behavior (a toy
-   "locker" XORs decoy files the sandbox created); they do not do real harm.
-4. **Never load a real malware sample into this.** This lab is for stand-ins you
-   wrote. Analyzing live malware needs an isolated VM with no network and
-   snapshots — a different setup than a Python sandbox on your daily driver.
-
-If you replace `safety.py`, keep property (1): a specimen must not be able to
-reach the host. The static analyzer flags `subprocess`/`socket`/`winreg`/`ctypes`
-in a specimen precisely because those reach around the sandbox.
-
-## Run
+## Build
 
 ```bash
-python petri.py list
-python petri.py analyze <specimen>     # once analyzer.py is built
-python petri.py detonate <specimen>    # once a specimen exists
+cargo run          # will fail until the compile errors are fixed
 ```
 
-Python 3.10+. No third-party dependencies.
+Rust 2024 edition. The only direct dependency is `eframe` 0.32.
 
-## A suggested first milestone
+## Roadmap
 
-See `MILESTONES.md`. The shortest path to a working loop:
-1. Implement `shannon_entropy`, `extract_strings`, `analyze_file` in
-   `petri/core/analyzer.py`.
-2. Write one benign specimen (`specimens/toy_locker.py`) using only the sandbox.
-3. `python petri.py analyze toy_locker` then `detonate toy_locker` — read your
-   own specimen the way an analyst would read an unknown one.
+[`MILESTONES.md`](MILESTONES.md) is the real plan and the honest log of what's
+actually done. Short version: get it compiling, make isolation mean something,
+then write the first benign specimen.
+
+---
+
+## License, in one paragraph
+
+Petri is **source-available, not open source**. You can download it for free,
+run it, read it, modify it privately, and quote bits of it with credit. You may
+**not** redistribute it — no mirrors, no re-uploads, no package registries, no
+selling it. [github.com/PyMite6941/petri](https://github.com/PyMite6941/petri)
+is the only authorized place to get it. GitHub forks are fine; taking it
+somewhere else is not. If you copy code out of it, credit it visibly and link
+back — the exact wording is in [NOTICE](NOTICE).
+
+Full terms: [LICENSE](LICENSE). This is a custom license, so GitHub will show it
+as "Other" — don't assume MIT.
+
+## No contributors
+
+**This project accepts no contributions and never will.** One author, on
+purpose. Pull requests get closed unmerged, patches aren't accepted, and there
+are no maintainer slots. The point of Petri is that I build it myself, and I
+can't vouch for containment code I didn't write.
+
+Bug reports are welcome — describe the behavior, not the patch. Containment
+escapes go through [SECURITY.md](SECURITY.md), privately. The full policy is in
+[CONTRIBUTING.md](CONTRIBUTING.md).
+
+---
+
+Copyright (c) 2026 PyMite6941. All rights reserved.

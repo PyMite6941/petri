@@ -1,1 +1,14 @@
 /target
+/sandboxes/
+
+# Rust
+Cargo.lock.orig
+**/*.rs.bk
+
+# Editors / OS
+.vscode/
+.idea/
+*.swp
+Thumbs.db
+Desktop.ini
+.DS_Store

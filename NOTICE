@@ -1,0 +1,39 @@
+Petri
+Copyright (c) 2026 PyMite6941
+https://github.com/PyMite6941/petri
+
+Licensed under the Petri Source-Available License v1.0 (see LICENSE).
+Free to download. Not free to redistribute. Attribution required.
+
+
+REQUIRED ATTRIBUTION
+--------------------
+Section 2 of the LICENSE requires visible credit on any copy, excerpt or
+derivative of this code that appears in your work. Copy one of the blocks
+below verbatim.
+
+In source code, adjacent to the copied code:
+
+    // Adapted from Petri by PyMite6941
+    // https://github.com/PyMite6941/petri
+    // Petri Source-Available License v1.0 — redistribution prohibited
+
+In an about box, credits screen or accompanying license file:
+
+    Contains code from Petri (c) 2026 PyMite6941
+    https://github.com/PyMite6941/petri
+
+In written or recorded work:
+
+    Petri, by PyMite6941. https://github.com/PyMite6941/petri
+
+Credit that is stripped, obscured, or moved somewhere the reader will not see
+it does not satisfy the license.
+
+
+THIRD-PARTY CODE
+----------------
+Petri depends on eframe/egui (MIT OR Apache-2.0), and transitively on the
+crates recorded in Cargo.lock. Those dependencies are the property of their
+respective authors and are governed by their own licenses, not by this one.
+Run `cargo tree` for the full list.
