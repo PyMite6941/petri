@@ -12,3 +12,6 @@ Cargo.lock.orig
 Thumbs.db
 Desktop.ini
 .DS_Store
+
+# This is a Rust project. No Python.
+*.py

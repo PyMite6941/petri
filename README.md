@@ -63,7 +63,7 @@ registry. The point is to make intent readable, not to actually do the thing.
 | `src/storage/storage.rs` | `PetriStorage` — creates the per-sandbox directory tree | works |
 | `src/ui/ui_display.rs`, `src/ui/uiDisplay.rs` | duplicate `Display` impls, neither declared in `mod.rs` | dead files, to be deleted |
 | `MILESTONES.md` | the roadmap and the accountability log | the plan |
-| `petri.py`, `run.sh`, `compile.sh` | leftovers from an earlier Python prototype and a Docker experiment | not wired to anything |
+| `run.sh`, `compile.sh` | leftovers from a Docker experiment | not wired to anything |
 
 ## Build
 

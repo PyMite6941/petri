@@ -4,9 +4,10 @@ You build the lab; I hold you to it. This file is the shared record. Each
 session we work together, I'll check the boxes against what's actually in the
 repo (not what you say you did) and log a dated line at the bottom.
 
-The project moved from the Python CLI prototype to a Rust + egui desktop app.
-The milestones below are the Rust path. The old Python milestones are dropped —
-`petri/core/analyzer.py` and `specimens/` were never written.
+The project moved from an early Python CLI prototype to a Rust + egui desktop
+app. The milestones below are the Rust path; the old ones are dropped, since
+nothing behind them was ever written. Petri is Rust only now — no Python goes
+back in.
 
 ## Milestones
 
@@ -62,10 +63,11 @@ The milestones below are the Rust path. The old Python milestones are dropped �
 
 ## Log
 
-- 2026-08-25 — Frame scaffolded (Python: safety.py containment guardrail +
-  stubbed analyzer + CLI + specimen contract). All milestones open.
+- 2026-08-25 — Frame scaffolded in the original Python prototype (containment
+  guardrail + stubbed analyzer + CLI + specimen contract). All milestones open.
 - 2026-09-06 — Rewritten in Rust + egui: sandbox state machine, permissions
   enum, error type, storage layout, egui window. Does not compile yet (4
   errors). Repo set up for publication: custom source-available LICENSE,
   NOTICE, CONTRIBUTING (no contributors), SECURITY, AUTHORS, README rewritten
-  to match the actual code. Milestones re-cut for the Rust path. Next up: M1.
+  to match the actual code. Milestones re-cut for the Rust path. The last
+  Python file was deleted and `*.py` is gitignored. Next up: M1.
