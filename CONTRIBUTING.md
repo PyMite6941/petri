@@ -42,8 +42,8 @@ contributors — see `LICENSE` §5.
   it privately, not in a public issue.
 - **Questions about how it works.** Ask.
 
-Issues may be disabled on this repository. If they are, use the contact route in
-`SECURITY.md`.
+Issues are open for bug reports only, and blank issues are turned off — use the
+bug report form. Security issues go through the Security tab, privately.
 
 ## Not a support channel
 

@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Containment escape or other security issue
+    url: https://github.com/PyMite6941/petri/security/advisories/new
+    about: Report privately, not here. Anything that lets a sandboxed process reach the host goes through private vulnerability reporting.
+  - name: Pull requests are not accepted
+    url: https://github.com/PyMite6941/petri/blob/master/CONTRIBUTING.md
+    about: Petri is a single-author project with no contributors, on purpose. Report the bug, not the patch.
+  - name: Licensing exception request
+    url: https://github.com/PyMite6941/petri/discussions
+    about: Redistribution, packaging or bundling needs written permission. Ask in Discussions.

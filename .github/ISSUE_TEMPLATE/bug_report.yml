@@ -1,0 +1,51 @@
+name: Bug report
+description: Something behaves incorrectly. Describe the behavior, not the patch.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Before you file: Petri is a work in progress and **does not compile yet**.
+        `cargo check` failing is known and tracked in `MILESTONES.md` (M1) — no
+        need to report it.
+
+        Also known and not bugs: the sandbox does not isolate anything, there are
+        no specimens, and `start_sandbox()` spawns a placeholder command.
+
+        **Do not paste patches or diffs.** This project accepts no code
+        contributions — see `CONTRIBUTING.md`.
+
+        **Containment escapes do not go here.** Report those privately via the
+        Security tab.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What did you do, what did you expect, what actually happened.
+    validations:
+      required: true
+  - type: input
+    id: commit
+    attributes:
+      label: Commit
+      description: Output of `git rev-parse --short HEAD`.
+    validations:
+      required: true
+  - type: input
+    id: env
+    attributes:
+      label: OS and Rust version
+      placeholder: "Windows 11 / rustc 1.94.1"
+    validations:
+      required: true
+  - type: checkboxes
+    id: ack
+    attributes:
+      label: Acknowledgements
+      options:
+        - label: I am not submitting code, a patch or a diff.
+          required: true
+        - label: This is not a containment escape (those go through the Security tab privately).
+          required: true
+        - label: I have not loaded real malware into Petri.
+          required: true
