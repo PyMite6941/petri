@@ -41,6 +41,9 @@ impl fmt::Display for SandboxError {
             SandboxError::ProcessStopFailed => {
                 write!(f,"Failed to stop process")
             }
+            SandboxError::PermissionNotFound(permission) => {
+                write!(f,"Invalid Permission: {}",permission)
+            }
         }
     }
 }
@@ -70,8 +73,8 @@ impl eframe::App for PetriApp {
                 }
                 ui.horizontal(|ui|{
                     ui.label("Permissions");
-                    ui.text_edit_multiline(&mut sandbox.permissions)
-                })
+                    ui.text_edit_multiline(&mut sandbox.permissions);
+                });
             }
         });
     }

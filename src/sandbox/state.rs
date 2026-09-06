@@ -30,6 +30,7 @@ pub enum SandboxError {
     DirectoryCreationFailed,
     ProcessLaunchFailed(std::io::Error),
     ProcessStopFailed,
+    PermissionNotFound(PetriPermissions),
     IsolationFailed,
     InvalidConfiguration(String),
 }
@@ -57,7 +58,10 @@ impl Isolated {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug,Clone,Copy,PartialEq,Eq)]
 pub enum PetriPermissions {
-    
+    ReadFiles,
+    WriteFiles,
+    ExecutePrograms,
+    NetworkAccess,
 }

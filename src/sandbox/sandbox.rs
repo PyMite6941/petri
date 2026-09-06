@@ -2,6 +2,7 @@ use super::state::Isolated;
 use super::state::PetriState;
 use super::state::SandboxError;
 use super::state::PetriPermissions;
+use std::io::Write;
 use std::path::PathBuf;
 use std::process::{Command,Child};
 
@@ -12,7 +13,7 @@ pub struct PetriSandbox {
     pub state:PetriState,
     pub isolate:Isolated,
     pub directory:PathBuf,
-    pub permissions:Vec<>,
+    pub permissions:vec![],
     pub process:Option<Child>,
 }
 
@@ -24,7 +25,7 @@ impl PetriSandbox {
             state: PetriState::Created,
             isolate:Isolated::NotIsolated,
             directory: PathBuf::from(format!("sandboxes/sandbox-{}",id)),
-            permissions: Vec<PetriPermissions>;
+            permissions: vec![],
             process: None,
         }
     }
@@ -54,6 +55,20 @@ impl PetriSandbox {
         self.process = Some(child);
         self.state = PetriState::Running;
         Ok(())
+    }
+
+    pub fn add_permissions(&mut self,permission:PetriPermissions) -> Result<(), SandboxError> {
+        self.permissions.push(permission);
+        Ok(())
+    }
+
+    pub fn remove_permissions(&mut self,permission:PetriPermissions) -> Result<(), SandboxError> {
+        if let Some(index) = self.pernissions.iter().position(|p| *p == permission) {
+            self.permissions.remove(index);
+            Ok(())
+        } else {
+            Err(SandboxError::PermissionNotFound(permission))
+        }
     }
 
     pub fn isolate_sandbox(&mut self) -> Result<(), SandboxError> {
