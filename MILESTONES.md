@@ -72,3 +72,11 @@ back in.
   `ui/mod.rs` as the single home for error display (duplicate `uiDisplay.rs`
   deleted, impl lifted out of `app.rs`, `Display` added for
   `PetriPermissions`) — 4 errors down to 3. Next up: M1.
+- 2026-09-10 — Backend refactor started: `SandboxConfig` field added and
+  `Option<Child>` replaced by a `PetriProcess` enum (None / Host / Container).
+  Half-applied — 7 errors, the config struct is not written yet. UI rebuilt as
+  one card per sandbox (they run independently, so no master-detail): a
+  multi-select permissions dropdown with removable chips, Run/Isolate/Destroy,
+  and a per-card activity log. UI verified clean against the intended backend.
+  README re-framed from "malware specimen lab" to defensive sandbox manager.
+  Offline work plan written to `NEXT-STEPS.md`. M1 still open.

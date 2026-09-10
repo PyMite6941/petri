@@ -1,8 +1,5 @@
-use super::state::Isolated;
-use super::state::PetriState;
-use super::state::SandboxError;
-use super::state::PetriPermissions;
-use std::io::Write;
+use super::state::{Isolated,PetriState,SandboxError,PetriPermissions};
+use crate::process::process::PetriProcess;
 use std::path::PathBuf;
 use std::process::{Command,Child};
 
@@ -10,11 +7,11 @@ use std::process::{Command,Child};
 pub struct PetriSandbox {
     pub id:u64,
     pub name:String,
+    pub config:SandboxConfig,
     pub state:PetriState,
     pub isolate:Isolated,
     pub directory:PathBuf,
-    pub permissions:vec![],
-    pub process:Option<Child>,
+    pub process:PetriProcess,
 }
 
 impl PetriSandbox {
@@ -63,11 +60,11 @@ impl PetriSandbox {
     }
 
     pub fn remove_permissions(&mut self,permission:PetriPermissions) -> Result<(), SandboxError> {
-        if let Some(index) = self.pernissions.iter().position(|p| *p == permission) {
+        if let Some(index) = self.permissions.iter().position(|p| *p == permission) {
             self.permissions.remove(index);
             Ok(())
         } else {
-            Err(SandboxError::PermissionNotFound(permission))
+            Err(SandboxError::PermissionNotFound)
         }
     }
 

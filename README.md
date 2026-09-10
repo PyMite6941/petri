@@ -1,12 +1,12 @@
 # Petri
 
-A sandbox manager for **benign, simulated** malware specimens — small programs
-you write yourself that *mimic* malware behavior, so you can break them down and
-watch what they do without any of it being real. It's a malware-analysis bench
-for learning how these things work by building and dissecting harmless
-stand-ins.
+A **defensive Linux sandbox manager**. Create a sandbox, choose what it's
+allowed to do, run a program inside it, and watch it. If something looks wrong,
+Petri isolates the sandbox immediately, records the event, and lets you decide
+whether to keep it isolated or destroy it.
 
 Written in Rust, with an [egui](https://github.com/emilk/egui) desktop UI.
+Linux first; Windows later.
 
 ---
 
@@ -14,56 +14,61 @@ Written in Rust, with an [egui](https://github.com/emilk/egui) desktop UI.
 
 Read this before you clone it. Being straight about the state of the code:
 
-- **`cargo check` currently fails.** Seven compile errors, in
-  `src/sandbox/sandbox.rs` and `src/ui/ui_display.rs`. This is expected — the
-  code is mid-write.
-- **The sandbox does not isolate anything yet.** `PetriSandbox` is a state
-  machine plus a directory path. `isolate_sandbox()` flips an enum and returns
-  `Ok`; there is no namespace, no jail, no seccomp, no container behind it. The
+- **`cargo check` currently fails.** Seven compile errors, from a half-applied
+  refactor in `src/sandbox/sandbox.rs` — `SandboxConfig` is referenced but not
+  yet written. The plan for fixing it is in [NEXT-STEPS.md](NEXT-STEPS.md).
+- **The sandbox does not isolate anything.** `PetriSandbox` is a state machine
+  plus a directory path. `isolate_sandbox()` flips an enum and returns `Ok`;
+  there is no namespace, no jail, no seccomp, no container behind it. The
   containment is *designed*, not *implemented*.
-- **There are no specimens.** Nothing to detonate.
-- **`start_sandbox()` spawns a literal placeholder** (`Command::new("some-program")`).
+- **`start_sandbox()` spawns a literal placeholder** (`Command::new("some-program")`),
+  which fails with ENOENT every time.
 
-So: nothing here is safe to point at anything real, and there is no working
-product to download and use yet. If you came looking for a finished tool, this
-isn't one. It's a build log you can read.
+So there is no working product here yet, and nothing in it is safe to point at
+anything real. **Do not treat this as a security boundary.** If you came looking
+for a finished tool, this isn't one — it's a build log you can read.
 
-**Never load real malware into this.** Not now, not when it compiles. See
+**Never load real malware into it.** Not now, not when it compiles. A userspace
+Rust process on your daily driver is not a detonation environment. See
 [SECURITY.md](SECURITY.md).
 
 ---
 
 ## What it's meant to become
 
-A desktop app where you create named sandboxes, give each one an explicit
-permission set, drop a specimen into it, and watch what it does:
-
 - **Sandboxes have a lifecycle.** `Created → Starting → Running → Stopping →
   Stopped → Destroyed`, with illegal transitions refused rather than tolerated
-  (`PetriState::can_transition`).
+  (`PetriState::can_transition`). `Destroyed` is terminal.
+- **Isolation is a security axis, not a lifecycle state.** A risk detected while
+  a sandbox is `Running` forces `NotIsolated → Isolating → Isolated`, and from
+  there you either stay isolated or destroy.
 - **Permissions are opt-in, not opt-out.** `ReadFiles`, `WriteFiles`,
   `ExecutePrograms`, `NetworkAccess` — a sandbox starts with none of them.
-- **Isolation is a separate axis from run state.** `NotIsolated → Isolating →
-  Isolated`, and a sandbox can only be isolated from `Running` or `Stopped`.
-- **Everything lives under `sandboxes/sandbox-<id>/`** with `files/` and `logs/`
-  subdirectories, created by `PetriStorage` and thrown away afterwards.
+- **Config is separate from runtime.** `SandboxConfig` is what the user asked
+  for and is what gets persisted; the live state, isolation status and process
+  handle are not. The same split as `Command` vs `Child`.
+- **Everything lives under `sandboxes/sandbox-<id>/`** with `files/` and
+  `logs/`. Destroying a sandbox removes the ephemeral data; logs survive.
 
-The design rule underneath all of it: a specimen never gets the real machine, it
-gets a sandbox. Dangerous behaviors get *simulated and logged*, never performed —
-a "C2 beacon" is recorded and never sent, "persistence" writes to a fake
-registry. The point is to make intent readable, not to actually do the thing.
+The rule underneath all of it: **prevention, not just detection**. The real
+boundary has to be kernel- or container-enforced — Docker, seccomp, AppArmor,
+fanotify permission events. A userspace scanner decides; it is never the
+boundary itself. Until that lands, the word "sandbox" here is aspirational and
+this README will keep saying so.
 
 ## Repo layout
 
 | Path | What it is | State |
 |---|---|---|
 | `src/main.rs` | eframe entry point, boots `PetriApp` | works |
-| `src/ui/app.rs` | the egui window — sandbox list, create/start/isolate/destroy buttons | compiles; borrow errors will surface once the lib builds |
+| `src/ui/app.rs` | the egui window — one card per sandbox: permissions picker, Run/Isolate/Destroy, per-card log | done |
+| `src/ui/ui_display.rs` | `Display` for `SandboxError` — human-readable error text | live |
 | `src/sandbox/state.rs` | `PetriState`, `Isolated`, `PetriPermissions`, `SandboxError` | mostly there |
-| `src/sandbox/sandbox.rs` | `PetriSandbox` — lifecycle, permissions, process handle | **doesn't compile**; isolation is a stub |
-| `src/storage/storage.rs` | `PetriStorage` — creates the per-sandbox directory tree | works |
-| `src/ui/ui_display.rs` | `Display` for `SandboxError` — the human-readable error text | declared in `mod.rs`; **doesn't compile** |
-| `MILESTONES.md` | the roadmap and the accountability log | the plan |
+| `src/sandbox/sandbox.rs` | `PetriSandbox` — lifecycle, permissions, process handle | **doesn't compile** — mid-refactor; isolation is a stub |
+| `src/process/` | `PetriProcess` — the runtime handle (host child, or container later) | scaffolded; not declared in `main.rs` yet |
+| `src/storage/storage.rs` | `PetriStorage` — the per-sandbox directory tree | stub; not called by anything |
+| `NEXT-STEPS.md` | the ordered work plan, with the reasoning | current |
+| `MILESTONES.md` | milestones and the dated accountability log | the plan |
 | `run.sh`, `compile.sh` | leftovers from a Docker experiment | not wired to anything |
 
 ## Build
@@ -72,15 +77,17 @@ registry. The point is to make intent readable, not to actually do the thing.
 cargo run          # will fail until the compile errors are fixed
 ```
 
-Build output goes to `dist/`, not `target/` (`.cargo/config.toml`).
+Rust 2024 edition, stable toolchain. The only direct dependency is `eframe` 0.32.
+Build output goes to `dist/`, not `target/` (see `.cargo/config.toml`).
 
-Rust 2024 edition. The only direct dependency is `eframe` 0.32.
+Developed under WSL2 + WSLg, which runs the egui window fine. Container and
+kernel-policy behaviour should be checked on real Linux, since WSL2 differs.
 
 ## Roadmap
 
-[`MILESTONES.md`](MILESTONES.md) is the real plan and the honest log of what's
-actually done. Short version: get it compiling, make isolation mean something,
-then write the first benign specimen.
+[`NEXT-STEPS.md`](NEXT-STEPS.md) is the ordered plan — what to build, in what
+order, and why. [`MILESTONES.md`](MILESTONES.md) is the checklist and the honest
+log of what's actually done.
 
 ---
 

@@ -30,7 +30,7 @@ pub enum SandboxError {
     DirectoryCreationFailed,
     ProcessLaunchFailed(std::io::Error),
     ProcessStopFailed,
-    PermissionNotFound(PetriPermissions),
+    PermissionNotFound,
     IsolationFailed,
     InvalidConfiguration(String),
 }

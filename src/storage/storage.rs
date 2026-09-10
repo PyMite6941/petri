@@ -11,12 +11,4 @@ impl PetriStorage {
             root: PathBuf::from("sandboxes"),
         }
     }
-
-    pub fn create_sandbox(&self,id:u32) -> std::io::Result<PathBuf> {
-        let sandbox_path = self.root.join(format!("sandbox-{}",id));
-        fs::create_dir_all(&sandbox_path)?;
-        fs::create_dir_all(sandbox_path.join("files"))?;
-        fs::create_dir_all(sandbox_path.join("logs"))?;
-        Ok(sandbox_path)
-    }
 }
