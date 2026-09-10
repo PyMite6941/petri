@@ -16,3 +16,6 @@ Desktop.ini
 
 # This is a Rust project. No Python.
 *.py
+
+# private working notes
+FUNCTIONS-TODO.md
