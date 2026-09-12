@@ -1,7 +1,7 @@
 use eframe::egui;
 use std::collections::HashMap;
 use crate::sandbox::sandbox::{PetriSandbox,SandboxConfig};
-use crate::sandbox::state::{PetriPermissions,PetriState,SandboxError};
+use crate::sandbox::state::{Isolated,PetriPermissions,PetriState,SandboxError};
 
 // every permission the picker offers
 const ALL_PERMISSIONS:[PetriPermissions;4] = [
@@ -85,6 +85,8 @@ pub struct PetriApp {
     form_program:String,
     form_network:bool,
     form_permissions:Vec<PetriPermissions>,
+    // id -> in-progress rename text. present only while that card is being renamed.
+    renaming:HashMap<u64,String>,
 }
 
 impl PetriApp {
@@ -98,6 +100,7 @@ impl PetriApp {
             form_program: String::new(),
             form_network: false,
             form_permissions: Vec::new(),
+            renaming: HashMap::new(),
         }
     }
 
@@ -130,7 +133,8 @@ impl PetriApp {
             permissions: self.form_permissions.clone(),
         };
         let id = self.next_id;
-        self.sandboxes.push(PetriSandbox::new_sandbox(id,config));
+        // name is passed separately as well as inside the config
+        self.sandboxes.push(PetriSandbox::new_sandbox(id,config.name.clone(),config));
         self.next_id += 1;
         self.log(id,"created".to_string());
 
@@ -191,13 +195,50 @@ impl PetriApp {
         let id = self.sandboxes[index].id();
         let mut drop_from_list = false;
 
+        // read-only look at the disk: is the directory actually built?
+        // this only decides whether a button is offered - it enforces nothing.
+        let directory = self.sandboxes[index].directory().clone();
+        let built = directory.join("files").is_dir() && directory.join("logs").is_dir();
+
         egui::Frame::group(ui.style()).show(ui, |ui| {
             ui.horizontal(|ui| {
-                ui.strong(self.sandboxes[index].name().to_string());
+                match self.renaming.get(&id).cloned() {
+                    Some(mut draft) => {
+                        let response = ui.text_edit_singleline(&mut draft);
+                        self.renaming.insert(id,draft.clone());
+                        let commit = ui.button("Save").clicked()
+                            || (response.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter)));
+                        if commit {
+                            let trimmed = draft.trim().to_string();
+                            if trimmed.is_empty() {
+                                self.log(id,"rename ignored: name cannot be empty".to_string());
+                            } else {
+                                self.sandboxes[index].set_name(trimmed.clone());
+                                self.sandboxes[index].config.name = trimmed.clone();
+                                self.log(id,format!("renamed to {}",trimmed));
+                            }
+                            self.renaming.remove(&id);
+                        }
+                        if ui.button("Cancel").clicked() {
+                            self.renaming.remove(&id);
+                        }
+                    }
+                    None => {
+                        ui.strong(self.sandboxes[index].name().to_string());
+                        if ui.small_button("Rename").clicked() {
+                            let current = self.sandboxes[index].name().to_string();
+                            self.renaming.insert(id,current);
+                        }
+                    }
+                }
                 ui.separator();
                 ui.label(format!("{:?}",self.sandboxes[index].state()));
                 ui.separator();
                 ui.label(format!("{:?}",self.sandboxes[index].isolate));
+                if !built {
+                    ui.separator();
+                    ui.weak("not built");
+                }
             });
 
             egui::Grid::new("card_details").num_columns(2).spacing([12.0,4.0]).show(ui, |ui| {
@@ -211,7 +252,7 @@ impl PetriApp {
                 ui.end_row();
 
                 ui.label("Directory");
-                ui.label(format!("{}",self.sandboxes[index].directory().display()));
+                ui.label(format!("{}",directory.display()));
                 ui.end_row();
             });
 
@@ -227,26 +268,60 @@ impl PetriApp {
                 self.report(id,&format!("revoke {}",permission_label(permission)),result);
             }
 
+            // ask the state machine what is legal rather than hardcoding it here.
+            // a button only appears when its transition is actually possible.
+            let state = self.sandboxes[index].state();
+            let can_create = state.can_transition(&PetriState::Created);
+            let can_run = state.can_transition(&PetriState::Starting) && built;
+            let can_stop = state.can_transition(&PetriState::Stopping);
+            // borrow rather than move - Isolated is not Copy
+            let can_isolate = self.sandboxes[index].isolate.can_isolate(&state,&Isolated::Isolating);
+
             ui.horizontal(|ui| {
-                if ui.button("Run").clicked() {
-                    let result = self.sandboxes[index].start_sandbox();
-                    self.report(id,"run",result);
+                if can_create {
+                    if ui.button("Create").on_hover_text("Build the sandbox directory on disk").clicked() {
+                        let result = self.sandboxes[index].create_sandbox().map(|_| ());
+                        self.report(id,"create",result);
+                    }
                 }
-                ui.add_enabled(false,egui::Button::new("Stop"))
-                    .on_disabled_hover_text("stop_sandbox() does not exist in the backend yet");
-                if ui.button("Isolate").clicked() {
-                    let result = self.sandboxes[index].isolate_sandbox();
-                    self.report(id,"isolate",result);
+
+                // Run needs a legal transition AND the directory actually built
+                if can_run {
+                    if ui.button("Run").clicked() {
+                        let result = self.sandboxes[index].start_sandbox();
+                        self.report(id,"run",result);
+                    }
+                } else if state.can_transition(&PetriState::Starting) && !built {
+                    ui.add_enabled(false,egui::Button::new("Run"))
+                        .on_disabled_hover_text("sandbox directory is not built yet - press Create");
                 }
+
+                if can_stop {
+                    if ui.button("Stop").clicked() {
+                        let result = self.sandboxes[index].stop_sandbox();
+                        self.report(id,"stop",result);
+                    }
+                }
+
+                if can_isolate {
+                    if ui.button("Isolate").clicked() {
+                        let result = self.sandboxes[index].isolate_sandbox();
+                        self.report(id,"isolate",result);
+                    }
+                }
+
+                // destroy is always offered
                 if ui.button("Destroy").clicked() {
                     let result = self.sandboxes[index].destroy_sandbox();
                     self.report(id,"destroy",result);
                 }
+
                 if ui.button("Open Directory").clicked() {
                     let path = format!("{}",self.sandboxes[index].directory().display());
                     self.log(id,format!("directory: {}",path));
                 }
-                if self.sandboxes[index].state() == PetriState::Destroyed {
+
+                if state == PetriState::Destroyed {
                     if ui.button("Remove from list").clicked() {
                         drop_from_list = true;
                     }

@@ -1,3 +1,5 @@
+use std::process::Child;
+
 #[derive(Debug)]
 pub enum PetriProcess {
     None,

@@ -28,6 +28,15 @@ impl fmt::Display for SandboxError {
             SandboxError::PermissionNotFound => {
                 write!(f,"Permission not found")
             }
+            SandboxError::StorageFailed(error) => {
+                write!(f,"Storage error: {}",error)
+            }
+            SandboxError::ConfigSerializeFailed(error) => {
+                write!(f,"Failed to write config: {}",error)
+            }
+            SandboxError::ConfigParseFailed(error) => {
+                write!(f,"Failed to read config: {}",error)
+            }
         }
     }
 }

@@ -3,7 +3,7 @@ name = "petri"
 version = "0.1.0"
 edition = "2024"
 authors = ["PyMite6941"]
-description = "A sandbox manager for benign, simulated malware specimens. Work in progress."
+description = "A defensive Linux sandbox manager. Work in progress."
 readme = "README.md"
 repository = "https://github.com/PyMite6941/petri"
 license-file = "LICENSE"
@@ -14,5 +14,7 @@ publish = false
 
 [dependencies]
 eframe = "0.32"
+serde = { version = "1", features = ["derive"] }
+toml = "0.8"
 
 [lib]
