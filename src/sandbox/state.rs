@@ -25,6 +25,7 @@ impl PetriState {
             (PetriState::Running,PetriState::Destroyed) => true,
             (PetriState::Stopping,PetriState::Stopped) => true,
             (PetriState::Stopped,PetriState::Destroyed) => true,
+            (PetriState::Running,PetriState::Ran) => true,
             (PetriState::Stopped,PetriState::Ran) => true,
             (PetriState::Ran,PetriState::Destroyed) => true,
             _ => false,

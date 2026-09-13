@@ -20,6 +20,8 @@ pub struct PetriSandbox {
 pub struct SandboxConfig {
     pub name:String,
     pub program:String,
+    // the container image the program runs inside
+    pub image:String,
     pub network_enabled:bool,
     pub permissions:Vec<PetriPermissions>,
 }
@@ -78,6 +80,9 @@ impl PetriSandbox {
         let path = self.directory.clone();
         fs::create_dir_all(path.join("files"))?;
         fs::create_dir_all(path.join("logs"))?;
+        // the container is built with the directory, so it exists for the
+        // whole life of the sandbox rather than only while it runs
+        self.process = PetriProcess::create_container(self.id,&self.config,&self.directory)?;
         self.state = PetriState::Created;
         Ok(path)
     }
@@ -115,8 +120,7 @@ impl PetriSandbox {
             return Err(SandboxError::InvalidStateTransition);
         }
         self.state = PetriState::Starting;
-        let child:Child = Command::new("sleep").arg("30").current_dir(&self.directory).spawn().map_err(SandboxError::ProcessLaunchFailed)?;
-        self.process = PetriProcess::Host(child);
+        self.process.start(self.id)?;
         self.state = PetriState::Running;
         Ok(())
     }
@@ -126,14 +130,8 @@ impl PetriSandbox {
             return Err(SandboxError::InvalidStateTransition);
         }
         self.state = PetriState::Stopping;
-
-        // move the Child out of the field so we own it; kill needs ownership
-        if let PetriProcess::Host(mut child) = std::mem::replace(&mut self.process,PetriProcess::None) {
-            child.kill().map_err(|_| SandboxError::ProcessStopFailed)?;
-            // kill sends SIGKILL but does not reap - wait collects the exit status
-            child.wait().map_err(|_| SandboxError::ProcessStopFailed)?;
-        }
-
+        // the container is kept, only stopped - it is removed on destroy
+        self.process.stop(self.id)?;
         self.state = PetriState::Stopped;
         Ok(())
     }
@@ -159,7 +157,7 @@ impl PetriSandbox {
             return Err(SandboxError::InvalidStateTransition);
         }
         self.isolate = Isolated::Isolating;
-
+        self.process.pause(self.id)?;
         self.isolate = Isolated::Isolated;
         Ok(())
     }
@@ -168,8 +166,19 @@ impl PetriSandbox {
         if !self.state.can_transition(&PetriState::Destroyed) {
             return Err(SandboxError::InvalidStateTransition);
         }
+        // remove the container first, it holds the mount on files/
+        self.process.remove(self.id)?;
         fs::remove_dir_all(self.directory.join("files"))?;
         self.state = PetriState::Destroyed;
+        Ok(())
+    }
+
+    // the program finished on its own - nothing stopped it
+    pub fn mark_ran(&mut self) -> Result<(), SandboxError> {
+        if !self.state.can_transition(&PetriState::Ran) {
+            return Err(SandboxError::InvalidStateTransition);
+        }
+        self.state = PetriState::Ran;
         Ok(())
     }
 

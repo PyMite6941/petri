@@ -1,5 +1,7 @@
 use eframe::egui;
 use std::collections::HashMap;
+use std::time::{Duration,Instant};
+use crate::processes::processes::PetriProcess;
 use crate::sandbox::sandbox::{PetriSandbox,SandboxConfig};
 use crate::sandbox::state::{Isolated,PetriPermissions,PetriState,SandboxError};
 
@@ -13,6 +15,13 @@ const ALL_PERMISSIONS:[PetriPermissions;4] = [
 
 // keep a card's log from growing forever
 const MAX_LOG_LINES:usize = 200;
+
+// container image used when the create form leaves Image blank
+const DEFAULT_IMAGE:&str = "alpine";
+
+// how often to ask docker whether each running container is still alive.
+// every poll spawns a docker subprocess, so this must not run per frame.
+const POLL_INTERVAL:Duration = Duration::from_secs(1);
 
 fn permission_label(permission:PetriPermissions) -> &'static str {
     match permission {
@@ -74,6 +83,18 @@ fn permission_picker(
     (to_add,to_remove)
 }
 
+// an empty config, used only to build the throwaway sandbox that load_config
+// reads through. immediately replaced by the config read off disk.
+fn blank_config() -> SandboxConfig {
+    SandboxConfig {
+        name: String::new(),
+        program: String::new(),
+        image: String::new(),
+        network_enabled: false,
+        permissions: Vec::new(),
+    }
+}
+
 pub struct PetriApp {
     sandboxes:Vec<PetriSandbox>,
     next_id:u64,
@@ -83,25 +104,81 @@ pub struct PetriApp {
     show_create_form:bool,
     form_name:String,
     form_program:String,
+    form_image:String,
     form_network:bool,
     form_permissions:Vec<PetriPermissions>,
     // id -> in-progress rename text. present only while that card is being renamed.
     renaming:HashMap<u64,String>,
+    last_poll:Instant,
+    docker_ok:bool,
 }
 
 impl PetriApp {
     pub fn new() -> Self {
-        Self {
+        let mut app = Self {
             sandboxes: Vec::new(),
             next_id: 1,
             logs: HashMap::new(),
             show_create_form: false,
             form_name: String::new(),
             form_program: String::new(),
+            form_image: DEFAULT_IMAGE.to_string(),
             form_network: false,
             form_permissions: Vec::new(),
             renaming: HashMap::new(),
+            last_poll: Instant::now(),
+            docker_ok: PetriProcess::docker_available(),
+        };
+        app.restore_sandboxes();
+        app
+    }
+
+    // ask docker which containers are actually still running. a sandbox whose
+    // program ended by itself is no longer Running, and the card has to say so.
+    fn poll_running(&mut self) {
+        for index in 0..self.sandboxes.len() {
+            if self.sandboxes[index].state() != PetriState::Running {
+                continue;
+            }
+            let id = self.sandboxes[index].id();
+            if !self.sandboxes[index].process.is_running(id) {
+                let result = self.sandboxes[index].mark_ran();
+                self.report(id,"program finished",result);
+            }
         }
+    }
+
+    // read sandboxes/ back off disk on launch. a sandbox that was running
+    // before is gone, so everything comes back as a built, idle sandbox.
+    fn restore_sandboxes(&mut self) {
+        let ids = match PetriSandbox::parse_sandboxes() {
+            Ok(ids) => ids,
+            // no sandboxes/ directory yet is the normal first-run case
+            Err(_) => return,
+        };
+
+        let mut sorted = ids;
+        sorted.sort();
+
+        for id in sorted {
+            // load_config needs a sandbox to read through, and the directory
+            // is derived from the id, so build a throwaway to read with first.
+            let probe = PetriSandbox::new_sandbox(id,String::new(),blank_config());
+            let config = match probe.load_config() {
+                Ok(config) => config,
+                Err(_) => continue,
+            };
+
+            let mut sandbox = PetriSandbox::new_sandbox(id,config.name.clone(),config);
+            // the directory already exists; create_dir_all is idempotent and
+            // this moves it out of ReadyToCreate into Created.
+            let _ = sandbox.create_sandbox();
+            self.sandboxes.push(sandbox);
+            self.log(id,"restored from disk".to_string());
+        }
+
+        // never hand out an id that already owns a directory
+        self.next_id = self.sandboxes.iter().map(|s| s.id()).max().unwrap_or(0) + 1;
     }
 
     fn log(&mut self,id:u64,line:String) {
@@ -126,9 +203,15 @@ impl PetriApp {
         } else {
             self.form_name.trim().to_string()
         };
+        let image = if self.form_image.trim().is_empty() {
+            DEFAULT_IMAGE.to_string()
+        } else {
+            self.form_image.trim().to_string()
+        };
         let config = SandboxConfig {
             name,
             program: self.form_program.trim().to_string(),
+            image,
             network_enabled: self.form_network,
             permissions: self.form_permissions.clone(),
         };
@@ -140,6 +223,7 @@ impl PetriApp {
 
         self.form_name.clear();
         self.form_program.clear();
+        self.form_image = DEFAULT_IMAGE.to_string();
         self.form_network = false;
         self.form_permissions.clear();
         self.show_create_form = false;
@@ -156,6 +240,11 @@ impl PetriApp {
 
                 ui.label("Program");
                 ui.text_edit_singleline(&mut self.form_program);
+                ui.end_row();
+
+                ui.label("Image");
+                ui.text_edit_singleline(&mut self.form_image)
+                    .on_hover_text("container image the program runs inside");
                 ui.end_row();
 
                 ui.label("Network");
@@ -247,8 +336,16 @@ impl PetriApp {
                 ui.label(if program.is_empty() { "(none set)".to_string() } else { program });
                 ui.end_row();
 
+                ui.label("Image");
+                ui.label(self.sandboxes[index].config.image.clone());
+                ui.end_row();
+
                 ui.label("Network");
                 ui.label(if self.sandboxes[index].config.network_enabled { "Enabled" } else { "Disabled" });
+                ui.end_row();
+
+                ui.label("Process");
+                ui.label(self.sandboxes[index].process.describe());
                 ui.end_row();
 
                 ui.label("Directory");
@@ -281,7 +378,15 @@ impl PetriApp {
                 if can_create {
                     if ui.button("Create").on_hover_text("Build the sandbox directory on disk").clicked() {
                         let result = self.sandboxes[index].create_sandbox().map(|_| ());
+                        let created = result.is_ok();
                         self.report(id,"create",result);
+                        // start_sandbox only saves the config when it creates the
+                        // directory itself, so creating from here has to save too
+                        // or the sandbox never persists.
+                        if created {
+                            let saved = self.sandboxes[index].save_config();
+                            self.report(id,"save config",saved);
+                        }
                     }
                 }
 
@@ -349,9 +454,23 @@ impl PetriApp {
 
 impl eframe::App for PetriApp {
     fn update(&mut self,ctx:&egui::Context,_frame:&mut eframe::Frame) {
+        // immediate mode only redraws on input, so ask for a wake-up or a
+        // container that exits with the window idle would never be noticed
+        if self.last_poll.elapsed() >= POLL_INTERVAL {
+            self.last_poll = Instant::now();
+            self.poll_running();
+        }
+        ctx.request_repaint_after(POLL_INTERVAL);
+
         egui::TopBottomPanel::top("header").show(ctx, |ui| {
             ui.horizontal(|ui| {
                 ui.heading("Petri Sandboxes");
+                if !self.docker_ok {
+                    ui.colored_label(
+                        egui::Color32::from_rgb(220,120,60),
+                        "docker unavailable - sandboxes cannot be created",
+                    ).on_hover_text("start the docker daemon, then restart Petri");
+                }
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     if ui.button("[]").on_hover_text("Sandboxes root: sandboxes/").clicked() {
                         self.show_create_form = false;
