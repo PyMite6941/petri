@@ -1,9 +1,12 @@
 use super::state::{Isolated,PetriState,SandboxError,PetriPermissions};
 use crate::processes::processes::PetriProcess;
 use serde::{Serialize,Deserialize};
+use crate::processes::monitor::SecurityEvent;
 use std::fs;
+use std::fs::OpenOptions;
+use std::io::Write;
 use std::path::PathBuf;
-use std::process::{Child, Command};
+use std::time::{SystemTime,UNIX_EPOCH};
 
 #[derive(Debug)]
 pub struct PetriSandbox {
@@ -182,7 +185,60 @@ impl PetriSandbox {
         Ok(())
     }
 
+    // give a sandbox its network and scheduler back after it was isolated
+    pub fn release_sandbox(&mut self) -> Result<(), SandboxError> {
+        if !self.isolate.can_isolate(&self.state,&Isolated::NotIsolated) {
+            return Err(SandboxError::InvalidStateTransition);
+        }
+        self.process.unpause(self.id)?;
+        self.isolate = Isolated::NotIsolated;
+        Ok(())
+    }
+
+    // append one line to logs/<file>. the logs directory survives destroy, so
+    // this is the record that outlives the sandbox itself.
+    fn append_log(&self,file:&str,line:&str) -> Result<(), SandboxError> {
+        let path = self.directory.join("logs").join(file);
+        let mut handle = OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(path)
+            .map_err(SandboxError::StorageFailed)?;
+        let stamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map(|d| d.as_secs())
+            .unwrap_or(0);
+        writeln!(handle,"{} {}",stamp,line).map_err(SandboxError::StorageFailed)?;
+        Ok(())
+    }
+
+    pub fn append_event(&self,line:&str) -> Result<(), SandboxError> {
+        self.append_log("events.log",line)
+    }
+
+    pub fn append_security(&self,event:&SecurityEvent) -> Result<(), SandboxError> {
+        self.append_log("security.log",&format!("[{:?}] {}",event.severity,event.message))
+    }
+
+    // a risk was detected. contain first, record second - this must not depend
+    // on the UI being alive to run.
+    pub fn handle_risk(&mut self,event:SecurityEvent) -> Result<(), SandboxError> {
+        let _ = self.append_security(&event);
+        if self.state == PetriState::Running && self.isolate == Isolated::NotIsolated {
+            self.isolate_sandbox()?;
+        }
+        Ok(())
+    }
+
     pub fn state(&self) -> PetriState {
         self.state
+    }
+}
+
+impl Drop for PetriSandbox {
+    // a container outlives its parent process, unlike a host child, so this is
+    // what stops one surviving Petri. drop cannot fail, so errors go nowhere.
+    fn drop(&mut self) {
+        let _ = self.process.remove(self.id);
     }
 }

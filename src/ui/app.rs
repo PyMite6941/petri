@@ -1,6 +1,7 @@
 use eframe::egui;
 use std::collections::HashMap;
 use std::time::{Duration,Instant};
+use crate::processes::monitor::Monitor;
 use crate::processes::processes::PetriProcess;
 use crate::sandbox::sandbox::{PetriSandbox,SandboxConfig};
 use crate::sandbox::state::{Isolated,PetriPermissions,PetriState,SandboxError};
@@ -111,6 +112,7 @@ pub struct PetriApp {
     renaming:HashMap<u64,String>,
     last_poll:Instant,
     docker_ok:bool,
+    monitor:Monitor,
 }
 
 impl PetriApp {
@@ -128,6 +130,7 @@ impl PetriApp {
             renaming: HashMap::new(),
             last_poll: Instant::now(),
             docker_ok: PetriProcess::docker_available(),
+            monitor: Monitor::new(),
         };
         app.restore_sandboxes();
         app
@@ -144,6 +147,17 @@ impl PetriApp {
             if !self.sandboxes[index].process.is_running(id) {
                 let result = self.sandboxes[index].mark_ran();
                 self.report(id,"program finished",result);
+                continue;
+            }
+
+            // still running - ask the monitor whether it looks dangerous
+            let name = PetriProcess::container_name(id);
+            if let Some(event) = self.monitor.check(&name) {
+                let message = event.message.clone();
+                let severity = event.severity;
+                let result = self.sandboxes[index].handle_risk(event);
+                self.log(id,format!("RISK [{:?}] {}",severity,message));
+                self.report(id,"isolate on risk",result);
             }
         }
     }
@@ -182,6 +196,11 @@ impl PetriApp {
     }
 
     fn log(&mut self,id:u64,line:String) {
+        // mirror every line into logs/events.log so history outlives the app.
+        // best effort - a sandbox with no directory yet has nowhere to write.
+        if let Some(sandbox) = self.sandboxes.iter().find(|s| s.id() == id) {
+            let _ = sandbox.append_event(&line);
+        }
         let entries = self.logs.entry(id).or_insert_with(Vec::new);
         entries.push(line);
         if entries.len() > MAX_LOG_LINES {
@@ -189,12 +208,14 @@ impl PetriApp {
         }
     }
 
-    // one place to turn a backend Result into a log line
+    // one place to turn a backend Result into a log line. the same line goes
+    // to logs/events.log so the history outlives this process.
     fn report(&mut self,id:u64,action:&str,result:Result<(),SandboxError>) {
-        match result {
-            Ok(()) => self.log(id,format!("{} ok",action)),
-            Err(error) => self.log(id,format!("{} failed: {}",action,error)),
-        }
+        let line = match result {
+            Ok(()) => format!("{} ok",action),
+            Err(error) => format!("{} failed: {}",action,error),
+        };
+        self.log(id,line);
     }
 
     fn create_sandbox(&mut self) {
@@ -412,6 +433,28 @@ impl PetriApp {
                     if ui.button("Isolate").clicked() {
                         let result = self.sandboxes[index].isolate_sandbox();
                         self.report(id,"isolate",result);
+                    }
+                }
+
+                let can_release = self.sandboxes[index]
+                    .isolate
+                    .can_isolate(&state,&Isolated::NotIsolated);
+                if can_release {
+                    if ui.button("Continue")
+                        .on_hover_text("release the sandbox and let it run again")
+                        .clicked()
+                    {
+                        let result = self.sandboxes[index].release_sandbox();
+                        self.report(id,"continue",result);
+                    }
+                }
+
+                if state == PetriState::Running {
+                    if ui.button("Test risk")
+                        .on_hover_text("fire a fake risk to prove isolate-on-risk works")
+                        .clicked()
+                    {
+                        self.monitor.force_trigger = true;
                     }
                 }
 

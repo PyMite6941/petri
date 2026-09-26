@@ -10,6 +10,7 @@ pub enum PetriState {
     Stopped,
     Ran,
     Destroyed,
+    Isolated,
 }
 
 impl PetriState {
@@ -60,6 +61,10 @@ impl Isolated {
         match (self,state,next) {
             (Isolated::NotIsolated,PetriState::Running,Isolated::Isolating) => true,
             (Isolated::NotIsolated,PetriState::Stopped,Isolated::Isolating) => true,
+            (Isolated::Isolating,PetriState::Running,Isolated::Isolated) => true,
+            (Isolated::Isolating,PetriState::Stopped,Isolated::Isolated) => true,
+            (Isolated::Isolated,PetriState::Running,Isolated::NotIsolated) => true,
+            (Isolated::Isolated,PetriState::Stopped,Isolated::NotIsolated) => true,
             _ => false,
         }
     }
