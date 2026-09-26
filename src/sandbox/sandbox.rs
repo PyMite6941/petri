@@ -81,8 +81,10 @@ impl PetriSandbox {
             return Err(SandboxError::InvalidStateTransition);
         }
         let path = self.directory.clone();
-        fs::create_dir_all(path.join("files"))?;
-        fs::create_dir_all(path.join("logs"))?;
+        fs::create_dir_all(path.join("files"))
+            .map_err(|_| SandboxError::DirectoryCreationFailed)?;
+        fs::create_dir_all(path.join("logs"))
+            .map_err(|_| SandboxError::DirectoryCreationFailed)?;
         // the container is built with the directory, so it exists for the
         // whole life of the sandbox rather than only while it runs
         self.process = PetriProcess::create_container(self.id,&self.config,&self.directory)?;
@@ -97,7 +99,11 @@ impl PetriSandbox {
     }
 
     pub fn load_config(&self) -> Result<SandboxConfig,SandboxError> {
-        let text = fs::read_to_string(self.directory.join("config.toml"))?;
+        let config_path = self.directory.join("config.toml");
+        if !config_path.exists() {
+            return Err(SandboxError::SandboxNotFound);
+        }
+        let text = fs::read_to_string(config_path)?;
         let config:SandboxConfig = toml::from_str(&text)?;
         Ok(config)
     }

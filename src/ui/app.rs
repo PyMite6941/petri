@@ -387,7 +387,11 @@ impl PetriApp {
                 ui.end_row();
 
                 ui.label("Process");
-                ui.label(self.sandboxes[index].process.describe());
+                let described = self.sandboxes[index].process.describe();
+                match self.sandboxes[index].process.status(id) {
+                    Some(status) => ui.label(format!("{} ({})",described,status)),
+                    None => ui.label(described),
+                };
                 ui.end_row();
 
                 ui.label("Directory");

@@ -51,6 +51,10 @@ fn split_program(program:&str) -> Vec<String> {
 #[derive(Debug)]
 pub enum PetriProcess {
     None,
+    // kept as the fallback for running without docker. nothing constructs it
+    // today - containers are the only path - but the arms below already handle
+    // it, so the option costs nothing to keep open.
+    #[allow(dead_code)]
     Host(Child),
     Container {id:String},
 }

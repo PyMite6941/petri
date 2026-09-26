@@ -5,11 +5,16 @@ simulations. Treat everything here as experimental.
 
 ## Do not put real malware in it
 
-Petri does not currently isolate anything. The sandbox is a state machine and a
-directory layout; the enforcement is not written yet. Even when it is finished,
-a userspace Rust process on your daily-driver machine is not a malware
-detonation environment. Real samples need an air-gapped VM with snapshots and no
-network path back to anything you care about.
+Petri now runs programs inside Docker containers with the network off, a
+read-only root filesystem, all capabilities dropped, and a non-root user - and
+that containment has been verified. But it has been verified on **WSL2**, which
+is not bare-metal Linux, and seccomp and AppArmor profiles are not written yet.
+This is contained, not hardened.
+
+It is also a personal project by someone learning Rust, not audited software.
+A container is not an air-gapped VM: kernel escapes exist, and a real malware
+sample deserves a disposable machine with snapshots and no network path back to
+anything you care about.
 
 Loading live malware into Petri is a breach of `LICENSE` §4 and a bad idea on
 its own merits.

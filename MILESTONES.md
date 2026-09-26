@@ -80,3 +80,14 @@ back in.
   and a per-card activity log. UI verified clean against the intended backend.
   README re-framed from "malware specimen lab" to defensive sandbox manager.
   Offline work plan written to `NEXT-STEPS.md`. M1 still open.
+- 2026-09-26 — Containment is real. Docker is the boundary: containers are
+  created with the sandbox, isolate is `docker pause`, and permissions became
+  container flags. Verified on WSL2 - non-root, network unreachable, /etc
+  read-only, host home invisible, writes confined to the mount. Isolation now
+  reverses (release_sandbox + Continue). `Drop` stops a container outliving
+  Petri. Config and logs persist; sandboxes restore on launch. Severity drives
+  the response - only Critical isolates - over CPU, memory, pid-count and a
+  rule that treats any traffic on a no-network sandbox as a containment
+  failure. 15 unit tests plus an end-to-end pass against real Docker.
+  README and SECURITY.md corrected: they claimed no isolation, which is no
+  longer true. M1-M4 effectively closed; M5 (behavioural report) open.

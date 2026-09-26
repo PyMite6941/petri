@@ -178,14 +178,23 @@ impl Monitor {
     pub fn evaluate(&self,stats:&ContainerStats,network_expected:bool) -> Option<SecurityEvent> {
         let mut findings:Vec<SecurityEvent> = Vec::new();
 
-        if !network_expected && stats.net_rx_bytes > QUIET_NETWORK_BYTES {
-            findings.push(SecurityEvent::new(
-                Severity::Critical,
-                format!(
-                    "network traffic ({:.0} bytes in) on a sandbox with no network - containment may have failed",
-                    stats.net_rx_bytes,
-                ),
-            ));
+        if stats.net_rx_bytes > QUIET_NETWORK_BYTES {
+            if network_expected {
+                // allowed, but a record of what crossed the boundary is the
+                // point of having a security log at all
+                findings.push(SecurityEvent::new(
+                    Severity::Info,
+                    format!("{:.0} bytes received over the granted network",stats.net_rx_bytes),
+                ));
+            } else {
+                findings.push(SecurityEvent::new(
+                    Severity::Critical,
+                    format!(
+                        "network traffic ({:.0} bytes in) on a sandbox with no network - containment may have failed",
+                        stats.net_rx_bytes,
+                    ),
+                ));
+            }
         }
 
         if stats.cpu_percent >= self.cpu_critical {
@@ -269,9 +278,11 @@ mod tests {
     }
 
     #[test]
-    fn traffic_is_fine_when_the_network_was_granted() {
+    fn granted_network_traffic_is_recorded_but_not_acted_on() {
         let monitor = Monitor::new();
-        assert!(monitor.evaluate(&stats(1.0,1.0,1,50_000.0),true).is_none());
+        let event = monitor.evaluate(&stats(1.0,1.0,1,50_000.0),true).unwrap();
+        assert_eq!(event.severity,Severity::Info);
+        assert!(!event.severity.requires_isolation());
     }
 
     #[test]
