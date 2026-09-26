@@ -11,6 +11,43 @@ const CONTAINER_PREFIX:&str = "petri-";
 // the container workdir that the sandbox files/ directory is mounted onto
 const WORKDIR:&str = "/work";
 
+// Split a program string into a binary and its arguments the way a shell
+// would. Plain split_whitespace tears quoted arguments apart, so
+//   sh -c "while true; do :; done"
+// became seven broken tokens and the container died on a syntax error.
+// Quotes group, and are not kept in the token.
+fn split_program(program:&str) -> Vec<String> {
+    let mut parts = Vec::new();
+    let mut current = String::new();
+    let mut quote:Option<char> = None;
+    let mut started = false;
+
+    for character in program.chars() {
+        match quote {
+            Some(open) if character == open => {
+                quote = None;
+            }
+            Some(_) => current.push(character),
+            None if character == '\'' || character == '"' => {
+                quote = Some(character);
+                // an empty quoted string is still an argument
+                started = true;
+            }
+            None if character.is_whitespace() => {
+                if started || !current.is_empty() {
+                    parts.push(std::mem::take(&mut current));
+                    started = false;
+                }
+            }
+            None => current.push(character),
+        }
+    }
+    if started || !current.is_empty() {
+        parts.push(current);
+    }
+    parts
+}
+
 #[derive(Debug)]
 pub enum PetriProcess {
     None,
@@ -104,8 +141,8 @@ impl PetriProcess {
 
         // Command::new takes the executable only, so the program string has to
         // be split the same way a shell would split it.
-        for part in config.program.split_whitespace() {
-            args.push(part.to_string());
+        for part in split_program(&config.program) {
+            args.push(part);
         }
 
         let borrowed:Vec<&str> = args.iter().map(|a| a.as_str()).collect();
@@ -205,5 +242,41 @@ impl PetriProcess {
                 format!("container {}",short)
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::split_program;
+
+    #[test]
+    fn plain_words() {
+        assert_eq!(split_program("sleep 30"),vec!["sleep","30"]);
+    }
+
+    #[test]
+    fn double_quotes_group() {
+        assert_eq!(
+            split_program("sh -c \"while true; do :; done\""),
+            vec!["sh","-c","while true; do :; done"],
+        );
+    }
+
+    #[test]
+    fn single_quotes_group() {
+        assert_eq!(
+            split_program("echo 'hello world'"),
+            vec!["echo","hello world"],
+        );
+    }
+
+    #[test]
+    fn extra_whitespace_is_ignored() {
+        assert_eq!(split_program("  ls   -la  "),vec!["ls","-la"]);
+    }
+
+    #[test]
+    fn empty_is_empty() {
+        assert!(split_program("").is_empty());
     }
 }
