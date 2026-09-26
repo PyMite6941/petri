@@ -143,6 +143,8 @@ impl PetriApp {
     // program ended by itself is no longer Running, and the card has to say so.
     fn poll_running(&mut self) {
         for index in 0..self.sandboxes.len() {
+            // a frozen sandbox is not making progress, so there is nothing to
+            // poll; its container is still there and still paused.
             if self.sandboxes[index].state() != PetriState::Running {
                 continue;
             }
@@ -577,8 +579,10 @@ impl eframe::App for PetriApp {
 
             if let Some(index) = drop_index {
                 let id = self.sandboxes[index].id();
+                self.monitor.forget(&PetriProcess::container_name(id));
                 self.sandboxes.remove(index);
                 self.logs.remove(&id);
+                self.last_severity.remove(&id);
             }
         });
     }

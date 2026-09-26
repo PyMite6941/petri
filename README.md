@@ -80,10 +80,15 @@ One `docker stats` sample per second per running sandbox, turned into findings:
 
 | Signal | Warning | Critical |
 |---|---|---|
-| CPU | ≥60% | ≥90% |
-| Memory | ≥75% | ≥90% — about to be OOM-killed |
-| Processes | ≥64 | ≥96 of the 128 limit — fork bomb |
+| CPU | ≥90% | **never** |
+| Memory | ≥85% | **never** — the cgroup limit already caps it |
+| Processes | ≥64 | ≥96 of the 128 limit, sustained — fork bomb |
 | Network on a sandbox with none | — | **any traffic at all** |
+
+Only evidence that the sandbox is doing something it should not be *able* to do
+earns an automatic isolation. Expensive is not the same as dangerous: a
+legitimate compute task sits at ~98% CPU, and freezing it mid-run means the work
+never finishes. That is a broken sandbox, not a secure one.
 
 Severity decides the response, and that rule lives on the enum rather than at
 each call site:

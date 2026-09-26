@@ -1,6 +1,7 @@
 // Risk detection. The rules live here; the response lives on PetriSandbox
 // (handle_risk), so a risk is contained whether or not the UI is running.
 
+use std::collections::HashMap;
 use std::process::Command;
 
 // ---------------------------------------------------------------- severity
@@ -116,22 +117,34 @@ fn parse_size(text:&str) -> f64 {
 
 // ---------------------------------------------------------------- monitor
 
-// thresholds. warning says look at this; critical says stop it.
-const CPU_WARNING:f32 = 60.0;
-const CPU_CRITICAL:f32 = 90.0;
-const MEMORY_WARNING:f32 = 75.0;
-const MEMORY_CRITICAL:f32 = 90.0;
+// What earns an automatic isolation, and what does not.
+//
+// Only evidence that the sandbox is doing something it should not be ABLE to
+// do gets isolated. Expensive is not the same as dangerous: a legitimate
+// compute task sits at ~98% CPU, and freezing it mid-run means the work never
+// finishes. That is a broken sandbox, not a secure one.
+//
+//   network traffic with no network  -> critical. containment has failed.
+//   process count near the ceiling   -> critical, once sustained. fork bomb.
+//   cpu                              -> warning only, ever.
+//   memory                           -> warning. docker OOM-kills it anyway.
+const CPU_WARNING:f32 = 90.0;
+const MEMORY_WARNING:f32 = 85.0;
 // --pids-limit is 128, so these are half and three quarters of the ceiling
 const PIDS_WARNING:u32 = 64;
 const PIDS_CRITICAL:u32 = 96;
 // a sandbox created with the network off should move no bytes at all
 const QUIET_NETWORK_BYTES:f64 = 1_024.0;
+// how many consecutive samples a resource breach has to survive before it
+// counts. one sample is noise - startup alone can peg a core.
+const SUSTAINED_SAMPLES:u32 = 5;
 
 pub struct Monitor {
     pub cpu_warning:f32,
-    pub cpu_critical:f32,
     pub memory_warning:f32,
-    pub memory_critical:f32,
+    // consecutive samples with the process count over the critical mark,
+    // per container. a fork bomb keeps climbing; a busy moment does not.
+    pids_streak:HashMap<String,u32>,
     // set from the UI to prove the risk -> isolate -> log path end to end
     // without waiting for a real rule to fire
     pub force_trigger:bool,
@@ -147,9 +160,8 @@ impl Monitor {
     pub fn new() -> Self {
         Self {
             cpu_warning: CPU_WARNING,
-            cpu_critical: CPU_CRITICAL,
             memory_warning: MEMORY_WARNING,
-            memory_critical: MEMORY_CRITICAL,
+            pids_streak: HashMap::new(),
             force_trigger: false,
         }
     }
@@ -170,12 +182,32 @@ impl Monitor {
         }
 
         let stats = ContainerStats::sample(container_name)?;
-        self.evaluate(&stats,network_expected)
+
+        // track how long the process count has been over the line
+        let streak = self.pids_streak.entry(container_name.to_string()).or_insert(0);
+        if stats.pids >= PIDS_CRITICAL {
+            *streak += 1;
+        } else {
+            *streak = 0;
+        }
+        let pids_sustained = *streak >= SUSTAINED_SAMPLES;
+
+        self.evaluate(&stats,network_expected,pids_sustained)
+    }
+
+    // forget a container that is gone, so its streak does not linger
+    pub fn forget(&mut self,container_name:&str) {
+        self.pids_streak.remove(container_name);
     }
 
     // pure rule evaluation, split out so it can be tested without docker.
     // returns the most severe finding - one alarm is easier to act on than six.
-    pub fn evaluate(&self,stats:&ContainerStats,network_expected:bool) -> Option<SecurityEvent> {
+    pub fn evaluate(
+        &self,
+        stats:&ContainerStats,
+        network_expected:bool,
+        pids_sustained:bool,
+    ) -> Option<SecurityEvent> {
         let mut findings:Vec<SecurityEvent> = Vec::new();
 
         if stats.net_rx_bytes > QUIET_NETWORK_BYTES {
@@ -197,37 +229,28 @@ impl Monitor {
             }
         }
 
-        if stats.cpu_percent >= self.cpu_critical {
-            findings.push(SecurityEvent::new(
-                Severity::Critical,
-                format!("cpu at {:.1}% (limit {:.1}%)",stats.cpu_percent,self.cpu_critical),
-            ));
-        } else if stats.cpu_percent >= self.cpu_warning {
+        // cpu never isolates. a sandbox exists to run work, and work is
+        // expensive - pausing it for being busy defeats the whole point.
+        if stats.cpu_percent >= self.cpu_warning {
             findings.push(SecurityEvent::new(
                 Severity::Warning,
                 format!("cpu at {:.1}%",stats.cpu_percent),
             ));
         }
 
-        if stats.memory_percent >= self.memory_critical {
-            findings.push(SecurityEvent::new(
-                Severity::Critical,
-                format!(
-                    "memory at {:.1}% of its limit - the container is about to be killed",
-                    stats.memory_percent,
-                ),
-            ));
-        } else if stats.memory_percent >= self.memory_warning {
+        // memory does not isolate either: the cgroup limit already caps it and
+        // docker OOM-kills the container if it goes over. saying so is enough.
+        if stats.memory_percent >= self.memory_warning {
             findings.push(SecurityEvent::new(
                 Severity::Warning,
-                format!("memory at {:.1}%",stats.memory_percent),
+                format!("memory at {:.1}% of its limit",stats.memory_percent),
             ));
         }
 
-        if stats.pids >= PIDS_CRITICAL {
+        if stats.pids >= PIDS_CRITICAL && pids_sustained {
             findings.push(SecurityEvent::new(
                 Severity::Critical,
-                format!("{} processes - close to the limit, looks like a fork bomb",stats.pids),
+                format!("{} processes, sustained - this is a fork bomb",stats.pids),
             ));
         } else if stats.pids >= PIDS_WARNING {
             findings.push(SecurityEvent::new(
@@ -251,28 +274,30 @@ mod tests {
     #[test]
     fn idle_container_is_quiet() {
         let monitor = Monitor::new();
-        assert!(monitor.evaluate(&stats(0.5,1.0,1,0.0),false).is_none());
+        assert!(monitor.evaluate(&stats(0.5,1.0,1,0.0),false,false).is_none());
     }
 
     #[test]
-    fn busy_cpu_is_critical() {
+    fn a_busy_task_is_never_isolated() {
+        // this is the bug that froze real work: 98% cpu is what compute looks
+        // like, not what an attack looks like.
         let monitor = Monitor::new();
-        let event = monitor.evaluate(&stats(99.0,1.0,1,0.0),false).unwrap();
-        assert_eq!(event.severity,Severity::Critical);
-    }
-
-    #[test]
-    fn moderate_cpu_is_only_a_warning() {
-        let monitor = Monitor::new();
-        let event = monitor.evaluate(&stats(70.0,1.0,1,0.0),false).unwrap();
+        let event = monitor.evaluate(&stats(98.0,1.0,1,0.0),false,false).unwrap();
         assert_eq!(event.severity,Severity::Warning);
+        assert!(!event.severity.requires_isolation(),"cpu must never freeze a sandbox");
+    }
+
+    #[test]
+    fn memory_pressure_warns_but_does_not_isolate() {
+        let monitor = Monitor::new();
+        let event = monitor.evaluate(&stats(1.0,99.0,1,0.0),false,false).unwrap();
         assert!(!event.severity.requires_isolation());
     }
 
     #[test]
     fn traffic_without_network_is_a_containment_failure() {
         let monitor = Monitor::new();
-        let event = monitor.evaluate(&stats(1.0,1.0,1,50_000.0),false).unwrap();
+        let event = monitor.evaluate(&stats(1.0,1.0,1,50_000.0),false,false).unwrap();
         assert_eq!(event.severity,Severity::Critical);
         assert!(event.message.contains("containment"));
     }
@@ -280,23 +305,33 @@ mod tests {
     #[test]
     fn granted_network_traffic_is_recorded_but_not_acted_on() {
         let monitor = Monitor::new();
-        let event = monitor.evaluate(&stats(1.0,1.0,1,50_000.0),true).unwrap();
+        let event = monitor.evaluate(&stats(1.0,1.0,1,50_000.0),true,false).unwrap();
         assert_eq!(event.severity,Severity::Info);
         assert!(!event.severity.requires_isolation());
     }
 
     #[test]
-    fn many_processes_looks_like_a_fork_bomb() {
+    fn a_process_spike_alone_is_only_a_warning() {
         let monitor = Monitor::new();
-        let event = monitor.evaluate(&stats(1.0,1.0,100,0.0),false).unwrap();
+        let event = monitor.evaluate(&stats(1.0,1.0,100,0.0),false,false).unwrap();
+        assert_eq!(event.severity,Severity::Warning);
+    }
+
+    #[test]
+    fn a_sustained_process_climb_is_a_fork_bomb() {
+        let monitor = Monitor::new();
+        let event = monitor.evaluate(&stats(1.0,1.0,100,0.0),false,true).unwrap();
         assert_eq!(event.severity,Severity::Critical);
     }
 
     #[test]
     fn the_worst_finding_wins() {
         let monitor = Monitor::new();
-        // a warning and a critical at once - critical is what gets reported
-        let event = monitor.evaluate(&stats(70.0,95.0,1,0.0),false).unwrap();
+        // busy and out of memory at once, but neither isolates
+        let event = monitor.evaluate(&stats(95.0,95.0,1,0.0),false,false).unwrap();
+        assert_eq!(event.severity,Severity::Warning);
+        // add a containment failure and that is what gets reported
+        let event = monitor.evaluate(&stats(95.0,95.0,1,50_000.0),false,false).unwrap();
         assert_eq!(event.severity,Severity::Critical);
     }
 

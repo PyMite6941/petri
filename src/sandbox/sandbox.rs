@@ -168,6 +168,11 @@ impl PetriSandbox {
         self.isolate = Isolated::Isolating;
         self.process.pause(self.id)?;
         self.isolate = Isolated::Isolated;
+        // the lifecycle enters Isolated too, so the state alone says the
+        // sandbox is frozen and nothing inside it is progressing
+        if self.state.can_transition(&PetriState::Isolated) {
+            self.state = PetriState::Isolated;
+        }
         Ok(())
     }
 
@@ -198,6 +203,10 @@ impl PetriSandbox {
         }
         self.process.unpause(self.id)?;
         self.isolate = Isolated::NotIsolated;
+        // back to running - the container was never stopped, only frozen
+        if self.state == PetriState::Isolated {
+            self.state = PetriState::Running;
+        }
         Ok(())
     }
 
@@ -235,7 +244,9 @@ impl PetriSandbox {
         if !event.severity.requires_isolation() {
             return Ok(());
         }
-        if self.state == PetriState::Running && self.isolate == Isolated::NotIsolated {
+        if (self.state == PetriState::Running || self.state == PetriState::Isolated)
+            && self.isolate == Isolated::NotIsolated
+        {
             self.isolate_sandbox()?;
         }
         Ok(())
