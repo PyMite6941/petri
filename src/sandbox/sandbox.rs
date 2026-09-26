@@ -217,13 +217,18 @@ impl PetriSandbox {
     }
 
     pub fn append_security(&self,event:&SecurityEvent) -> Result<(), SandboxError> {
-        self.append_log("security.log",&format!("[{:?}] {}",event.severity,event.message))
+        self.append_log("security.log",&format!("[{}] {}",event.severity.label(),event.message))
     }
 
     // a risk was detected. contain first, record second - this must not depend
     // on the UI being alive to run.
     pub fn handle_risk(&mut self,event:SecurityEvent) -> Result<(), SandboxError> {
         let _ = self.append_security(&event);
+        // severity decides the response. a warning is recorded and surfaced but
+        // left running - isolating on every twitch trains people to ignore it.
+        if !event.severity.requires_isolation() {
+            return Ok(());
+        }
         if self.state == PetriState::Running && self.isolate == Isolated::NotIsolated {
             self.isolate_sandbox()?;
         }

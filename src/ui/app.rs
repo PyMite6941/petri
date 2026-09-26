@@ -1,7 +1,7 @@
 use eframe::egui;
 use std::collections::HashMap;
 use std::time::{Duration,Instant};
-use crate::processes::monitor::Monitor;
+use crate::processes::monitor::{Monitor,Severity};
 use crate::processes::processes::PetriProcess;
 use crate::sandbox::sandbox::{PetriSandbox,SandboxConfig};
 use crate::sandbox::state::{Isolated,PetriPermissions,PetriState,SandboxError};
@@ -113,6 +113,8 @@ pub struct PetriApp {
     last_poll:Instant,
     docker_ok:bool,
     monitor:Monitor,
+    // most recent finding per sandbox, so the card can show it
+    last_severity:HashMap<u64,Severity>,
 }
 
 impl PetriApp {
@@ -131,6 +133,7 @@ impl PetriApp {
             last_poll: Instant::now(),
             docker_ok: PetriProcess::docker_available(),
             monitor: Monitor::new(),
+            last_severity: HashMap::new(),
         };
         app.restore_sandboxes();
         app
@@ -152,12 +155,21 @@ impl PetriApp {
 
             // still running - ask the monitor whether it looks dangerous
             let name = PetriProcess::container_name(id);
-            if let Some(event) = self.monitor.check(&name) {
+            let networked = self.sandboxes[index].config.network_enabled;
+            if let Some(event) = self.monitor.check(&name,networked) {
                 let message = event.message.clone();
                 let severity = event.severity;
+                let isolating = severity.requires_isolation();
                 let result = self.sandboxes[index].handle_risk(event);
-                self.log(id,format!("RISK [{:?}] {}",severity,message));
-                self.report(id,"isolate on risk",result);
+                self.log(id,format!("{} {}",severity.label(),message));
+                // only a critical finding stops the sandbox, so only report
+                // the isolation attempt when one was actually made
+                if isolating {
+                    self.report(id,"isolate on risk",result);
+                } else if let Err(error) = result {
+                    self.log(id,format!("risk handling failed: {}",error));
+                }
+                self.last_severity.insert(id,severity);
             }
         }
     }
@@ -348,6 +360,15 @@ impl PetriApp {
                 if !built {
                     ui.separator();
                     ui.weak("not built");
+                }
+                if let Some(severity) = self.last_severity.get(&id).copied() {
+                    ui.separator();
+                    let colour = match severity {
+                        Severity::Info => egui::Color32::from_rgb(120,160,220),
+                        Severity::Warning => egui::Color32::from_rgb(220,170,60),
+                        Severity::Critical => egui::Color32::from_rgb(220,80,80),
+                    };
+                    ui.colored_label(colour,severity.label());
                 }
             });
 
